@@ -1,12 +1,12 @@
 # dirstat a cli directory information tool
-```
+```bash
 $ dirstat
  directory: 71
       file: 109
 ```
 
 # Build
-```
+```bash
 $ zig build
 ```
 Zig's advanced build system sets up all the dependencies.
