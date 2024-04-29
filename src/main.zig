@@ -67,23 +67,21 @@ fn pathWalker(path: []const u8) !void {
     const stdout = std.io.getStdOut().writer();
 
     {
-        var kinds_ordered = order.OrderBy(u32, .valueDescending).init(allocator);
-        defer kinds_ordered.deinit();
-        var count_entry_kind_iter = count_entry_kind.iterator();
-        while (count_entry_kind_iter.next()) |entry| {
-            try kinds_ordered.add(@tagName(entry.key), entry.value.*);
-        }
-        try print.printIterator(stdout, "kind", &kinds_ordered);
+        var ordered = order.OrderBy(u32, .valueDescending).init(allocator);
+        defer ordered.deinit();
+        var iter = count_entry_kind.iterator();
+        try ordered.addEnumIterator(&iter);
+        try print.printIterator(stdout, "kind", &ordered);
     }
 
     try stdout.print("\n", .{});
 
     {
-        var extensions_ordered = order.OrderBy(u32, .valueDescending).init(allocator);
-        defer extensions_ordered.deinit();
-        var count_extensions_iter = count_extensions.iterator();
-        try extensions_ordered.addPtrIterator(&count_extensions_iter);
-        try print.printIterator(stdout, "extension", &extensions_ordered);
+        var ordered = order.OrderBy(u32, .valueDescending).init(allocator);
+        defer ordered.deinit();
+        var iter = count_extensions.iterator();
+        try ordered.addPtrIterator(&iter);
+        try print.printIterator(stdout, "extension", &ordered);
     }
 }
 

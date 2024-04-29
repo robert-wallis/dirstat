@@ -41,9 +41,19 @@ pub fn OrderBy(comptime V: type, order: Order) type {
             try self.queue.add(.{ .key = key, .value = value });
         }
 
+        /// Adds all the items where the key is an enum.  Changes the key to the @tagName of the enum.
+        pub fn addEnumIterator(self: *Self, iter: anytype) !void {
+            while (iter.next()) |elem| {
+                if (elem.value.* > 0)
+                    try self.add(@tagName(elem.key), elem.value.*);
+            }
+        }
+
+        /// Adds all the items where the key is a string.
         pub fn addPtrIterator(self: *Self, iter: anytype) !void {
             while (iter.next()) |elem| {
-                try self.add(elem.key_ptr.*, elem.value_ptr.*);
+                if (elem.value_ptr.* > 0)
+                    try self.add(elem.key_ptr.*, elem.value_ptr.*);
             }
         }
 
@@ -51,6 +61,8 @@ pub fn OrderBy(comptime V: type, order: Order) type {
             self.queue.deinit();
         }
 
+        /// Returns the next item pair or null if there are no more left.
+        /// Exhausts the inner collection.
         pub fn next(self: *Self) ?KV {
             return self.queue.removeOrNull();
         }
@@ -185,10 +197,7 @@ test "OrderBy .key K:enum" {
         defer ob.deinit();
 
         var iter = enum_array.iterator();
-        while (iter.next()) |elem| {
-            if (elem.value.* > 0)
-                try ob.add(@tagName(elem.key), elem.value.*);
-        }
+        try ob.addEnumIterator(&iter);
 
         const a = ob.next();
         const b = ob.next();
@@ -204,10 +213,7 @@ test "OrderBy .key K:enum" {
         defer ob.deinit();
 
         var iter = enum_array.iterator();
-        while (iter.next()) |elem| {
-            if (elem.value.* > 0)
-                try ob.add(@tagName(elem.key), elem.value.*);
-        }
+        try ob.addEnumIterator(&iter);
 
         const a = ob.next();
         const b = ob.next();
