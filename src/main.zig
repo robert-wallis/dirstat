@@ -1,24 +1,26 @@
+// Copyright (C) 2024 Robert A. Wallis, all rights reserved.
 const std = @import("std");
+const print = @import("print.zig");
 
 pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
+    const stdout_writer = std.io.getStdOut().writer();
+    var bw = std.io.bufferedWriter(stdout_writer);
 
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
 
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
+    const allocator = std.heap.page_allocator;
+    var root_dir = try std.fs.cwd().openDir(".", .{ .iterate = true });
+    defer root_dir.close();
 
-    try bw.flush(); // don't forget to flush!
-}
+    var count_entry_kind = std.EnumArray(std.fs.Dir.Entry.Kind, u32).initFill(0);
 
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
+    var walker = try root_dir.walk(allocator);
+    defer walker.deinit();
+
+    while (try walker.next()) |entry| {
+        count_entry_kind.getPtr(entry.kind).* += 1;
+    }
+
+    try print.printCountEntryKind(stdout, &count_entry_kind);
+    try bw.flush();
 }
