@@ -18,23 +18,6 @@ pub fn countEntryKindUnordered(writer: anytype, count_entry_kind: *std.EnumArray
     }
 }
 
-/// a single letter representing a directory entry kind
-pub fn singleLetterFileKind(kind: std.fs.Dir.Entry.Kind) u8 {
-    return switch (kind) {
-        .block_device => 'b',
-        .character_device => 'c',
-        .directory => 'd',
-        .named_pipe => 'p',
-        .sym_link => 's',
-        .file => 'f',
-        .unix_domain_socket => 'u',
-        .whiteout => 'w',
-        .door => 'r',
-        .event_port => 'e',
-        .unknown => '?',
-    };
-}
-
 pub fn extensionsUnordered(writer: anytype, count_extensions: *std.StringHashMap(u32)) !void {
     try writer.print("extensions:\n", .{});
     var iter = count_extensions.iterator();

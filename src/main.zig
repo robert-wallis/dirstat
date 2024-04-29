@@ -67,7 +67,7 @@ fn pathWalker(path: []const u8) !void {
     const stdout = std.io.getStdOut().writer();
 
     {
-        var kinds_ordered = order.OrderBy(u32, .value).init(allocator);
+        var kinds_ordered = order.OrderBy(u32, .valueDescending).init(allocator);
         defer kinds_ordered.deinit();
         var count_entry_kind_iter = count_entry_kind.iterator();
         while (count_entry_kind_iter.next()) |entry| {
@@ -79,7 +79,7 @@ fn pathWalker(path: []const u8) !void {
     try stdout.print("\n", .{});
 
     {
-        var extensions_ordered = order.OrderBy(u32, .value).init(allocator);
+        var extensions_ordered = order.OrderBy(u32, .valueDescending).init(allocator);
         defer extensions_ordered.deinit();
         var count_extensions_iter = count_extensions.iterator();
         try extensions_ordered.addPtrIterator(&count_extensions_iter);

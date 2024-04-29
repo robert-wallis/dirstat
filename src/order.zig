@@ -2,12 +2,21 @@
 const std = @import("std");
 
 pub const Order = enum {
-    unordered,
-    key,
-    value,
+    keyAscending, // reverse alphabetical
+    keyDescending, // alphabetical
+    valueAscending, // smallest to largest count
+    valueDescending, // largest to smallest count
 };
 
-fn highestValue(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
+fn valueAscendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
+    return struct {
+        fn compare(_: void, a: KV, b: KV) std.math.Order {
+            return std.math.order(a.value, b.value);
+        }
+    }.compare;
+}
+
+fn valueDescendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
     return struct {
         fn compare(_: void, a: KV, b: KV) std.math.Order {
             return std.math.order(b.value, a.value);
@@ -15,10 +24,18 @@ fn highestValue(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
     }.compare;
 }
 
-fn alphabeticKeyString(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
+fn keyAscendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
     return struct {
         fn compare(_: void, a: KV, b: KV) std.math.Order {
             return std.mem.order(u8, a.key, b.key);
+        }
+    }.compare;
+}
+
+fn keyDescendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
+    return struct {
+        fn compare(_: void, a: KV, b: KV) std.math.Order {
+            return std.mem.order(u8, b.key, a.key);
         }
     }.compare;
 }
@@ -30,9 +47,10 @@ pub fn OrderBy(comptime V: type, order: Order) type {
     };
 
     const compareFn = switch (order) {
-        .unordered => highestValue(KV),
-        .value => highestValue(KV),
-        .key => alphabeticKeyString(KV),
+        .keyAscending => keyAscendingCompare(KV),
+        .keyDescending => keyDescendingCompare(KV),
+        .valueAscending => valueAscendingCompare(KV),
+        .valueDescending => valueDescendingCompare(KV),
     };
     const CollectionPQ = std.PriorityQueue(KV, void, compareFn);
 
@@ -75,7 +93,7 @@ test "OrderBy .value K:[]const u8" {
     try hash_map.put("a", 10);
     try hash_map.put("b", 255);
 
-    var ob = OrderBy(u32, .value).init(allocator);
+    var ob = OrderBy(u32, .valueDescending).init(allocator);
     defer ob.deinit();
 
     var iter = hash_map.iterator();
@@ -99,7 +117,7 @@ test "OrderBy .key K:[]const u8" {
     try hash_map.put("a", 10);
     try hash_map.put("b", 255);
 
-    var ob = OrderBy(u32, .key).init(allocator);
+    var ob = OrderBy(u32, .keyAscending).init(allocator);
     defer ob.deinit();
 
     var iter = hash_map.iterator();
@@ -122,7 +140,7 @@ test "OrderBy .key K:enum" {
     enum_array.set(.directory, 10);
     enum_array.set(.sym_link, 255);
 
-    var ob = OrderBy(u32, .key).init(allocator);
+    var ob = OrderBy(u32, .keyAscending).init(allocator);
     defer ob.deinit();
 
     var iter = enum_array.iterator();
