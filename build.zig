@@ -65,6 +65,14 @@ pub fn build(b: *std.Build) void {
     }));
     test_step.dependOn(&main_tests.step);
 
+    const order_tests = b.addRunArtifact(b.addTest(.{
+        .name = "order",
+        .root_source_file = b.path("src/order.zig"),
+        .target = target,
+        .optimize = optimize,
+    }));
+    test_step.dependOn(&order_tests.step);
+
     const print_tests = b.addRunArtifact(b.addTest(.{
         .name = "print",
         .root_source_file = b.path("src/print.zig"),

@@ -1,6 +1,7 @@
 // Copyright (C) 2024 Robert A. Wallis, all rights reserved.
-const std = @import("std");
+const order = @import("order.zig");
 const print = @import("print.zig");
+const std = @import("std");
 const string = @import("string.zig");
 
 pub fn main() !void {
@@ -30,7 +31,7 @@ pub fn main() !void {
     }
 
     for (paths.items) |path| {
-        try stdout.print("path: {s}\n", .{path});
+        try stdout.print("path: {s}\n\n", .{path});
         try pathWalker(path);
     }
 }
@@ -64,10 +65,26 @@ fn pathWalker(path: []const u8) !void {
     }
 
     const stdout = std.io.getStdOut().writer();
+
+    {
+        var kinds_ordered = order.OrderBy(u32, .value).init(allocator);
+        defer kinds_ordered.deinit();
+        var count_entry_kind_iter = count_entry_kind.iterator();
+        while (count_entry_kind_iter.next()) |entry| {
+            try kinds_ordered.add(@tagName(entry.key), entry.value.*);
+        }
+        try print.printIterator(stdout, "kind", &kinds_ordered);
+    }
+
     try stdout.print("\n", .{});
-    try print.countEntryKind(stdout, &count_entry_kind);
-    try stdout.print("\n", .{});
-    try print.extensions(stdout, &count_extensions);
+
+    {
+        var extensions_ordered = order.OrderBy(u32, .value).init(allocator);
+        defer extensions_ordered.deinit();
+        var count_extensions_iter = count_extensions.iterator();
+        try extensions_ordered.addPtrIterator(&count_extensions_iter);
+        try print.printIterator(stdout, "extension", &extensions_ordered);
+    }
 }
 
 fn usage() !void {
