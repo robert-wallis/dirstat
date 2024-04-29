@@ -93,20 +93,38 @@ test "OrderBy .value K:[]const u8" {
     try hash_map.put("a", 10);
     try hash_map.put("b", 255);
 
-    var ob = OrderBy(u32, .valueDescending).init(allocator);
-    defer ob.deinit();
+    {
+        var ob = OrderBy(u32, .valueDescending).init(allocator);
+        defer ob.deinit();
 
-    var iter = hash_map.iterator();
-    try ob.addPtrIterator(&iter);
+        var iter = hash_map.iterator();
+        try ob.addPtrIterator(&iter);
 
-    const a = ob.next();
-    const b = ob.next();
-    const c = ob.next();
-    const d = ob.next();
-    try std.testing.expectEqual(255, a.?.value);
-    try std.testing.expectEqual(10, b.?.value);
-    try std.testing.expectEqual(1, c.?.value);
-    try std.testing.expectEqual(null, d);
+        const a = ob.next();
+        const b = ob.next();
+        const c = ob.next();
+        const d = ob.next();
+        try std.testing.expectEqual(255, a.?.value);
+        try std.testing.expectEqual(10, b.?.value);
+        try std.testing.expectEqual(1, c.?.value);
+        try std.testing.expectEqual(null, d);
+    }
+    {
+        var ob = OrderBy(u32, .valueAscending).init(allocator);
+        defer ob.deinit();
+
+        var iter = hash_map.iterator();
+        try ob.addPtrIterator(&iter);
+
+        const a = ob.next();
+        const b = ob.next();
+        const c = ob.next();
+        const d = ob.next();
+        try std.testing.expectEqual(1, a.?.value);
+        try std.testing.expectEqual(10, b.?.value);
+        try std.testing.expectEqual(255, c.?.value);
+        try std.testing.expectEqual(null, d);
+    }
 }
 
 test "OrderBy .key K:[]const u8" {
@@ -117,20 +135,38 @@ test "OrderBy .key K:[]const u8" {
     try hash_map.put("a", 10);
     try hash_map.put("b", 255);
 
-    var ob = OrderBy(u32, .keyAscending).init(allocator);
-    defer ob.deinit();
+    {
+        var ob = OrderBy(u32, .keyAscending).init(allocator);
+        defer ob.deinit();
 
-    var iter = hash_map.iterator();
-    try ob.addPtrIterator(&iter);
+        var iter = hash_map.iterator();
+        try ob.addPtrIterator(&iter);
 
-    const a = ob.next();
-    const b = ob.next();
-    const c = ob.next();
-    const d = ob.next();
-    try std.testing.expectEqualStrings("a", a.?.key);
-    try std.testing.expectEqualStrings("b", b.?.key);
-    try std.testing.expectEqualStrings("c", c.?.key);
-    try std.testing.expectEqual(null, d);
+        const a = ob.next();
+        const b = ob.next();
+        const c = ob.next();
+        const d = ob.next();
+        try std.testing.expectEqualStrings("a", a.?.key);
+        try std.testing.expectEqualStrings("b", b.?.key);
+        try std.testing.expectEqualStrings("c", c.?.key);
+        try std.testing.expectEqual(null, d);
+    }
+    {
+        var ob = OrderBy(u32, .keyDescending).init(allocator);
+        defer ob.deinit();
+
+        var iter = hash_map.iterator();
+        try ob.addPtrIterator(&iter);
+
+        const a = ob.next();
+        const b = ob.next();
+        const c = ob.next();
+        const d = ob.next();
+        try std.testing.expectEqualStrings("c", a.?.key);
+        try std.testing.expectEqualStrings("b", b.?.key);
+        try std.testing.expectEqualStrings("a", c.?.key);
+        try std.testing.expectEqual(null, d);
+    }
 }
 
 test "OrderBy .key K:enum" {
@@ -140,21 +176,42 @@ test "OrderBy .key K:enum" {
     enum_array.set(.directory, 10);
     enum_array.set(.sym_link, 255);
 
-    var ob = OrderBy(u32, .keyAscending).init(allocator);
-    defer ob.deinit();
+    {
+        var ob = OrderBy(u32, .keyAscending).init(allocator);
+        defer ob.deinit();
 
-    var iter = enum_array.iterator();
-    while (iter.next()) |elem| {
-        if (elem.value.* > 0)
-            try ob.add(@tagName(elem.key), elem.value.*);
+        var iter = enum_array.iterator();
+        while (iter.next()) |elem| {
+            if (elem.value.* > 0)
+                try ob.add(@tagName(elem.key), elem.value.*);
+        }
+
+        const a = ob.next();
+        const b = ob.next();
+        const c = ob.next();
+        const d = ob.next();
+        try std.testing.expectEqualStrings("directory", a.?.key);
+        try std.testing.expectEqualStrings("file", b.?.key);
+        try std.testing.expectEqualStrings("sym_link", c.?.key);
+        try std.testing.expectEqual(null, d);
     }
+    {
+        var ob = OrderBy(u32, .keyDescending).init(allocator);
+        defer ob.deinit();
 
-    const a = ob.next();
-    const b = ob.next();
-    const c = ob.next();
-    const d = ob.next();
-    try std.testing.expectEqualStrings("directory", a.?.key);
-    try std.testing.expectEqualStrings("file", b.?.key);
-    try std.testing.expectEqualStrings("sym_link", c.?.key);
-    try std.testing.expectEqual(null, d);
+        var iter = enum_array.iterator();
+        while (iter.next()) |elem| {
+            if (elem.value.* > 0)
+                try ob.add(@tagName(elem.key), elem.value.*);
+        }
+
+        const a = ob.next();
+        const b = ob.next();
+        const c = ob.next();
+        const d = ob.next();
+        try std.testing.expectEqualStrings("sym_link", a.?.key);
+        try std.testing.expectEqualStrings("file", b.?.key);
+        try std.testing.expectEqualStrings("directory", c.?.key);
+        try std.testing.expectEqual(null, d);
+    }
 }
