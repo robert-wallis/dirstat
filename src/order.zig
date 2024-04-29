@@ -8,38 +8,10 @@ pub const Order = enum {
     valueDescending, // largest to smallest count
 };
 
-fn valueAscendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
-    return struct {
-        fn compare(_: void, a: KV, b: KV) std.math.Order {
-            return std.math.order(a.value, b.value);
-        }
-    }.compare;
-}
-
-fn valueDescendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
-    return struct {
-        fn compare(_: void, a: KV, b: KV) std.math.Order {
-            return std.math.order(b.value, a.value);
-        }
-    }.compare;
-}
-
-fn keyAscendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
-    return struct {
-        fn compare(_: void, a: KV, b: KV) std.math.Order {
-            return std.mem.order(u8, a.key, b.key);
-        }
-    }.compare;
-}
-
-fn keyDescendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
-    return struct {
-        fn compare(_: void, a: KV, b: KV) std.math.Order {
-            return std.mem.order(u8, b.key, a.key);
-        }
-    }.compare;
-}
-
+/// Caller responsible for calling .deinit().
+/// Sorts the items in the collection.
+/// Use .next() to get the items out of OrderBy in the correct order.
+/// Using .next() is destructive, so once it it exhausted the whole OrderBy structure is no longer valid.
 pub fn OrderBy(comptime V: type, order: Order) type {
     const KV = struct {
         key: []const u8,
@@ -83,6 +55,38 @@ pub fn OrderBy(comptime V: type, order: Order) type {
             return self.queue.removeOrNull();
         }
     };
+}
+
+fn valueAscendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
+    return struct {
+        fn compare(_: void, a: KV, b: KV) std.math.Order {
+            return std.math.order(a.value, b.value);
+        }
+    }.compare;
+}
+
+fn valueDescendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
+    return struct {
+        fn compare(_: void, a: KV, b: KV) std.math.Order {
+            return std.math.order(b.value, a.value);
+        }
+    }.compare;
+}
+
+fn keyAscendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
+    return struct {
+        fn compare(_: void, a: KV, b: KV) std.math.Order {
+            return std.mem.order(u8, a.key, b.key);
+        }
+    }.compare;
+}
+
+fn keyDescendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
+    return struct {
+        fn compare(_: void, a: KV, b: KV) std.math.Order {
+            return std.mem.order(u8, b.key, a.key);
+        }
+    }.compare;
 }
 
 test "OrderBy .value K:[]const u8" {
