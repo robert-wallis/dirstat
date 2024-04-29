@@ -36,21 +36,59 @@ pub fn main() !void {
 
 fn pathWalker(path: []const u8) !void {
     const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(allocator);
+    defer arena.deinit();
+    const arena_alloc = arena.allocator();
 
     var root_dir = try std.fs.cwd().openDir(path, .{ .iterate = true });
     defer root_dir.close();
 
     var count_entry_kind = std.EnumArray(std.fs.Dir.Entry.Kind, u32).initFill(0);
+    var count_extensions = std.StringHashMap(u32).init(allocator);
+    defer count_extensions.deinit();
 
     var walker = try root_dir.walk(allocator);
     defer walker.deinit();
 
     while (try walker.next()) |entry| {
         count_entry_kind.getPtr(entry.kind).* += 1;
+        if (extension(entry.basename)) |ext| {
+            if (count_extensions.getPtr(ext)) |val| {
+                val.* += 1;
+            } else {
+                const ext_dup = try arena_alloc.dupe(u8, ext);
+                try count_extensions.put(ext_dup, 1);
+            }
+        }
     }
 
     const stdout = std.io.getStdOut().writer();
-    try print.printCountEntryKind(stdout, &count_entry_kind);
+    try stdout.print("\n", .{});
+    try print.countEntryKind(stdout, &count_entry_kind);
+    try stdout.print("\n", .{});
+    try print.extensions(stdout, &count_extensions);
+}
+
+fn extension(filename: []const u8) ?[]const u8 {
+    if (std.mem.lastIndexOf(u8, filename, ".")) |pos| {
+        return filename[pos..];
+    }
+    return null;
+}
+
+test extension {
+    try std.testing.expectEqualStrings(".jpg", extension("success-kid.jpg").?);
+    try std.testing.expectEqualStrings(".DS_Store", extension(".DS_Store").?);
+    try std.testing.expectEqualStrings("none", extension("LICENSE") orelse "none");
+
+    const oprah_bees = "oprah-bees.gif".*;
+    const fellow_kids = "fellow-kids.gif".*;
+    const oprah_bees_ext = extension(&oprah_bees).?;
+    const fellow_kids_ext = extension(&fellow_kids).?;
+    try std.testing.expectEqualStrings(oprah_bees_ext, fellow_kids_ext);
+
+    const hashString = std.hash_map.hashString;
+    try std.testing.expectEqual(hashString(oprah_bees_ext), hashString(fellow_kids_ext));
 }
 
 fn usage() !void {
