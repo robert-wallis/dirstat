@@ -5,6 +5,12 @@ $ dirstat
       file: 109
 ```
 
+# Build
+```
+$ zig build
+```
+Zig's advanced build system sets up all the dependencies.
+
 # Goals
 * quickly get simple stats about what's taking space in the folder
 
