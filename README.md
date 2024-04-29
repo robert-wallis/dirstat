@@ -1,6 +1,8 @@
 # dirstat a cli directory information tool
 ```
 $ dirstat
+ directory: 71
+      file: 109
 ```
 
 # Goals
