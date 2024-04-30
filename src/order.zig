@@ -13,88 +13,22 @@ pub const KV = struct {
     value: u64,
 };
 
-//
-const ContextKeyAsc = struct {
+const OrderContext = struct {
     const Self = @This();
+    order: Order,
     items: []KV,
-    pub fn lessThan(ctx: @This(), a: usize, b: usize) bool {
-        return std.mem.lessThan(u8, ctx.items[a].key, ctx.items[b].key);
-    }
-
-    pub fn swap(ctx: @This(), a: usize, b: usize) void {
-        return std.mem.swap(KV, &ctx.items[a], &ctx.items[b]);
-    }
-};
-
-const ContextKeyDesc = struct {
-    const Self = @This();
-    items: []KV,
-    pub fn lessThan(ctx: @This(), a: usize, b: usize) bool {
-        return std.mem.lessThan(u8, ctx.items[b].key, ctx.items[a].key); // backwards on purpose to do descending
-    }
-
-    pub fn swap(ctx: @This(), a: usize, b: usize) void {
-        return std.mem.swap(KV, &ctx.items[a], &ctx.items[b]);
-    }
-};
-
-const ContextValueAsc = struct {
-    const Self = @This();
-    items: []KV,
-    pub fn lessThan(ctx: @This(), a: usize, b: usize) bool {
-        return ctx.items[a].value < ctx.items[b].value;
-    }
-
-    pub fn swap(ctx: @This(), a: usize, b: usize) void {
-        return std.mem.swap(KV, &ctx.items[a], &ctx.items[b]);
-    }
-};
-
-const ContextValueDesc = struct {
-    const Self = @This();
-    items: []KV,
-    pub fn lessThan(ctx: @This(), a: usize, b: usize) bool {
-        return ctx.items[a].value > ctx.items[b].value;
-    }
-
-    pub fn swap(ctx: @This(), a: usize, b: usize) void {
-        return std.mem.swap(KV, &ctx.items[a], &ctx.items[b]);
-    }
-};
-
-const ContextUnion = union(Order) {
-    const Self = @This();
-
-    keyAscending: ContextKeyAsc,
-    keyDescending: ContextKeyDesc,
-    valueAscending: ContextValueAsc,
-    valueDescending: ContextValueDesc,
-
-    fn fromOrder(order: Order, items: []KV) ContextUnion {
-        return switch (order) {
-            .keyAscending => .{ .keyAscending = ContextKeyAsc{ .items = items } },
-            .keyDescending => .{ .keyDescending = ContextKeyDesc{ .items = items } },
-            .valueAscending => .{ .valueAscending = ContextValueAsc{ .items = items } },
-            .valueDescending => .{ .valueDescending = ContextValueDesc{ .items = items } },
-        };
-    }
 
     pub fn lessThan(self: Self, a: usize, b: usize) bool {
-        return switch (self) {
-            .keyAscending => |c| c.lessThan(a, b),
-            .keyDescending => |c| c.lessThan(a, b),
-            .valueAscending => |c| c.lessThan(a, b),
-            .valueDescending => |c| c.lessThan(a, b),
+        return switch (self.order) {
+            .keyAscending => return std.mem.lessThan(u8, self.items[a].key, self.items[b].key),
+            .keyDescending => return std.mem.lessThan(u8, self.items[b].key, self.items[a].key),
+            .valueAscending => return self.items[a].value < self.items[b].value,
+            .valueDescending => return self.items[a].value > self.items[b].value,
         };
     }
 
     pub fn swap(self: Self, a: usize, b: usize) void {
-        return switch (self) {
-            .keyAscending => |c| c.swap(a, b),
-            .keyDescending => |c| c.swap(a, b),
-            .valueAscending => |c| c.swap(a, b),
-            .valueDescending => |c| c.swap(a, b),
-        };
+        return std.mem.swap(KV, &self.items[a], &self.items[b]);
     }
 };
 
@@ -107,8 +41,7 @@ pub fn sortEnumIterator(allocator: std.mem.Allocator, iterator: anytype, order: 
             try list.append(.{ .key = @tagName(entry.key), .value = entry.value.* });
     }
 
-    const ctx = ContextUnion.fromOrder(order, list.items);
-    std.sort.pdqContext(0, list.items.len, ctx);
+    std.sort.pdqContext(0, list.items.len, OrderContext{ .items = list.items, .order = order });
 
     return try list.toOwnedSlice();
 }
@@ -122,8 +55,7 @@ pub fn sortStringIterator(allocator: std.mem.Allocator, iterator: anytype, order
             try list.append(.{ .key = entry.key_ptr.*, .value = entry.value_ptr.* });
     }
 
-    const ctx = ContextUnion.fromOrder(order, list.items);
-    std.sort.pdqContext(0, list.items.len, ctx);
+    std.sort.pdqContext(0, list.items.len, OrderContext{ .items = list.items, .order = order });
 
     return try list.toOwnedSlice();
 }
