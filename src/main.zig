@@ -99,9 +99,10 @@ fn pathWalker(path: []const u8) !void {
         kind_count.getPtr(entry.kind).* += 1;
 
         // get the stats for the file, so we can update the number of bytes it takes
-        const stat = try entry.dir.statFile(entry.basename);
+        const stat_opt: ?std.fs.File.Stat = entry.dir.statFile(entry.basename) catch null;
         // add to the bytes for this kind of file
-        kind_bytes.getPtr(entry.kind).* += stat.size;
+        if (stat_opt) |stat|
+            kind_bytes.getPtr(entry.kind).* += stat.size;
 
         // if there's a file extension
         if (string.extension(entry.basename)) |ext| {
@@ -113,14 +114,16 @@ fn pathWalker(path: []const u8) !void {
                 const ext_dup = try arena_alloc.dupe(u8, ext);
                 try extension_count.put(ext_dup, 1);
             }
-            // update size statistics for this stat
-            if (extension_bytes.getPtr(ext)) |val| {
-                // extension already list of bytes for this extension
-                val.* += stat.size;
-            } else {
-                // extension not in the map, need to alloc the key because it's owned by walker right now
-                const ext_dup = try arena_alloc.dupe(u8, ext);
-                try extension_bytes.put(ext_dup, stat.size);
+            if (stat_opt) |stat| {
+                // update size statistics for this stat
+                if (extension_bytes.getPtr(ext)) |val| {
+                    // extension already list of bytes for this extension
+                    val.* += stat.size;
+                } else {
+                    // extension not in the map, need to alloc the key because it's owned by walker right now
+                    const ext_dup = try arena_alloc.dupe(u8, ext);
+                    try extension_bytes.put(ext_dup, stat.size);
+                }
             }
         }
     }
