@@ -140,11 +140,65 @@ fn pathWalker(path: []const u8) !void {
     try stdout.print("\n", .{});
 
     {
+        const KV = struct {
+            key: []const u8,
+            value: u64,
+        };
+        const ValueDescending = struct {
+            items: []KV,
+            pub fn lessThan(_: @This(), lhs: KV, rhs: KV) bool {
+                return rhs.value < lhs.value; // backwards on purpose to do descending
+            }
+        };
+        var list = std.ArrayList(KV).init(allocator);
+        defer list.deinit();
+        var iter = kind_bytes.iterator();
+        while (iter.next()) |entry| {
+            if (entry.value.* > 0)
+                try list.append(.{ .key = @tagName(entry.key), .value = entry.value.* });
+        }
+        std.mem.sort(KV, list.items, ValueDescending{ .items = list.items }, ValueDescending.lessThan);
+        try stdout.print("bytes by kind:\n", .{});
+        for (list.items) |entry| {
+            try stdout.print("{}\t{s}\n", .{ entry.value, entry.key });
+        }
+    }
+
+    try stdout.print("\n", .{});
+
+    {
         var ordered = order.OrderBy(u32, .valueDescending).init(allocator);
         defer ordered.deinit();
         var iter = extension_count.iterator();
         try ordered.addPtrIterator(&iter);
         try print.printIterator(stdout, "extension", &ordered);
+    }
+
+    try stdout.print("\n", .{});
+
+    {
+        const KV = struct {
+            key: []const u8,
+            value: u64,
+        };
+        const ValueDescending = struct {
+            items: []KV,
+            pub fn lessThan(_: @This(), lhs: KV, rhs: KV) bool {
+                return rhs.value < lhs.value; // backwards on purpose to do descending
+            }
+        };
+        var list = std.ArrayList(KV).init(allocator);
+        defer list.deinit();
+        var iter = extension_bytes.iterator();
+        while (iter.next()) |entry| {
+            if (entry.value_ptr.* > 0)
+                try list.append(.{ .key = entry.key_ptr.*, .value = entry.value_ptr.* });
+        }
+        std.mem.sort(KV, list.items, ValueDescending{ .items = list.items }, ValueDescending.lessThan);
+        try stdout.print("bytes by extension:\n", .{});
+        for (list.items) |entry| {
+            try stdout.print("{}\t{s}\n", .{ entry.value, entry.key });
+        }
     }
 }
 
