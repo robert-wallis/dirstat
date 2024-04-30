@@ -32,6 +32,8 @@ const OrderContext = struct {
     }
 };
 
+/// Caller owns memory returned.
+/// Takes an iterator of enum,val entries, and sorts them into an list of []u8,val pairs.
 pub fn sortEnumIterator(allocator: std.mem.Allocator, iterator: anytype, order: Order) ![]KV {
     var list = std.ArrayList(KV).init(allocator);
     defer list.deinit();
@@ -46,6 +48,8 @@ pub fn sortEnumIterator(allocator: std.mem.Allocator, iterator: anytype, order: 
     return try list.toOwnedSlice();
 }
 
+/// Caller owns memory returned.
+/// Takes an iterator of []u8,val entries, and sorts them into an list of []u8,val pairs.
 pub fn sortStringIterator(allocator: std.mem.Allocator, iterator: anytype, order: Order) ![]KV {
     var list = std.ArrayList(KV).init(allocator);
     defer list.deinit();
