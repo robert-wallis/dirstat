@@ -36,24 +36,26 @@ pub fn analyzePath(path: []const u8, options: *const option.Options) !void {
             kind_bytes.getPtr(entry.kind).* += stat.size;
 
         // if there's a file extension
-        if (string.extension(entry.basename)) |ext| {
-            if (extension_count.getPtr(ext)) |val| {
-                // extension already in count
-                val.* += 1;
-            } else {
-                // extension not in count, need to alloc some space to save the string, because it is owned by walker right now
-                const ext_dup = try arena_alloc.dupe(u8, ext);
-                try extension_count.put(ext_dup, 1);
-            }
-            if (stat_opt) |stat| {
-                // update size statistics for this stat
-                if (extension_bytes.getPtr(ext)) |val| {
-                    // extension already list of bytes for this extension
-                    val.* += stat.size;
+        if (entry.kind == .file) {
+            if (string.extension(entry.basename)) |ext| {
+                if (extension_count.getPtr(ext)) |val| {
+                    // extension already in count
+                    val.* += 1;
                 } else {
-                    // extension not in the map, need to alloc the key because it's owned by walker right now
+                    // extension not in count, need to alloc some space to save the string, because it is owned by walker right now
                     const ext_dup = try arena_alloc.dupe(u8, ext);
-                    try extension_bytes.put(ext_dup, stat.size);
+                    try extension_count.put(ext_dup, 1);
+                }
+                if (stat_opt) |stat| {
+                    // update size statistics for this stat
+                    if (extension_bytes.getPtr(ext)) |val| {
+                        // extension already list of bytes for this extension
+                        val.* += stat.size;
+                    } else {
+                        // extension not in the map, need to alloc the key because it's owned by walker right now
+                        const ext_dup = try arena_alloc.dupe(u8, ext);
+                        try extension_bytes.put(ext_dup, stat.size);
+                    }
                 }
             }
         }
