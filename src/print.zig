@@ -1,11 +1,22 @@
 // Copyright (C) 2024 Robert A. Wallis, all rights reserved.
 const std = @import("std");
+const option = @import("option.zig");
 
-pub fn printIterator(writer: anytype, name: []const u8, iterator: anytype) !void {
-    try writer.print("{s}:\n", .{name});
-    while (iterator.next()) |entry| {
+pub fn printIterator(writer: anytype, items: anytype) !void {
+    for (items) |entry| {
         if (entry.value > 0)
             try writer.print("{}\t{s}\n", .{ entry.value, entry.key });
+    }
+}
+
+pub fn printBytesIterator(writer: anytype, items: anytype, options: *const option.Options) !void {
+    var human_buffer: [64]u8 = undefined;
+    for (items) |entry| {
+        if (options.human_readable_bytes) {
+            try writer.print("{s}\t{s}\n", .{ formatBytesHuman(&human_buffer, entry.value), entry.key });
+        } else {
+            try writer.print("{d}\t{s}\n", .{ entry.value, entry.key });
+        }
     }
 }
 

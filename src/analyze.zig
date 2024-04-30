@@ -66,84 +66,44 @@ pub fn analyzePath(path: []const u8, options: *const option.Options) !void {
     const stdout = std.io.getStdOut().writer();
 
     {
-        var ordered = order.OrderBy(u32, .valueDescending).init(allocator);
-        defer ordered.deinit();
-        var iter = kind_count.iterator();
-        try ordered.addEnumIterator(&iter);
-        try print.printIterator(stdout, "kind", &ordered);
+        var iterator = kind_count.iterator();
+        const items = try order.sortEnumIterator(allocator, &iterator, options.order_by);
+        defer allocator.free(items);
+
+        try stdout.print("kind:\n", .{});
+        try print.printIterator(stdout, items);
     }
 
     try stdout.print("\n", .{});
 
     {
-        const KV = struct {
-            key: []const u8,
-            value: u64,
-        };
-        const ValueDescending = struct {
-            items: []KV,
-            pub fn lessThan(_: @This(), lhs: KV, rhs: KV) bool {
-                return rhs.value < lhs.value; // backwards on purpose to do descending
-            }
-        };
-        var list = std.ArrayList(KV).init(allocator);
-        defer list.deinit();
-        var iter = kind_bytes.iterator();
-        while (iter.next()) |entry| {
-            if (entry.value.* > 0)
-                try list.append(.{ .key = @tagName(entry.key), .value = entry.value.* });
-        }
-        std.mem.sort(KV, list.items, ValueDescending{ .items = list.items }, ValueDescending.lessThan);
-        var human_buffer: [64]u8 = undefined;
+        var iterator = kind_bytes.iterator();
+        const items = try order.sortEnumIterator(allocator, &iterator, options.order_by);
+        defer allocator.free(items);
+
         try stdout.print("bytes by kind:\n", .{});
-        for (list.items) |entry| {
-            if (options.human_readable_bytes) {
-                try stdout.print("{s}\t{s}\n", .{ print.formatBytesHuman(&human_buffer, entry.value), entry.key });
-            } else {
-                try stdout.print("{d}\t{s}\n", .{ entry.value, entry.key });
-            }
-        }
+        try print.printBytesIterator(stdout, items, options);
     }
 
     try stdout.print("\n", .{});
 
     {
-        var ordered = order.OrderBy(u32, .valueDescending).init(allocator);
-        defer ordered.deinit();
-        var iter = extension_count.iterator();
-        try ordered.addPtrIterator(&iter);
-        try print.printIterator(stdout, "extension", &ordered);
+        var iterator = extension_count.iterator();
+        const items = try order.sortStringIterator(allocator, &iterator, options.order_by);
+        defer allocator.free(items);
+
+        try stdout.print("extension:\n", .{});
+        try print.printIterator(stdout, items);
     }
 
     try stdout.print("\n", .{});
 
     {
-        const KV = struct {
-            key: []const u8,
-            value: u64,
-        };
-        const ValueDescending = struct {
-            items: []KV,
-            pub fn lessThan(_: @This(), lhs: KV, rhs: KV) bool {
-                return rhs.value < lhs.value; // backwards on purpose to do descending
-            }
-        };
-        var list = std.ArrayList(KV).init(allocator);
-        defer list.deinit();
-        var iter = extension_bytes.iterator();
-        while (iter.next()) |entry| {
-            if (entry.value_ptr.* > 0)
-                try list.append(.{ .key = entry.key_ptr.*, .value = entry.value_ptr.* });
-        }
-        std.mem.sort(KV, list.items, ValueDescending{ .items = list.items }, ValueDescending.lessThan);
+        var iterator = extension_bytes.iterator();
+        const items = try order.sortStringIterator(allocator, &iterator, options.order_by);
+        defer allocator.free(items);
+
         try stdout.print("bytes by extension:\n", .{});
-        var human_buffer: [64]u8 = undefined;
-        for (list.items) |entry| {
-            if (options.human_readable_bytes) {
-                try stdout.print("{s}\t{s}\n", .{ print.formatBytesHuman(&human_buffer, entry.value), entry.key });
-            } else {
-                try stdout.print("{d}\t{s}\n", .{ entry.value, entry.key });
-            }
-        }
+        try print.printBytesIterator(stdout, items, options);
     }
 }

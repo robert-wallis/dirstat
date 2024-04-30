@@ -57,6 +57,14 @@ pub fn build(b: *std.Build) void {
 
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
+    const analyze_tests = b.addRunArtifact(b.addTest(.{
+        .name = "analyze",
+        .root_source_file = b.path("src/analyze.zig"),
+        .target = target,
+        .optimize = optimize,
+    }));
+    test_step.dependOn(&analyze_tests.step);
+
     const main_tests = b.addRunArtifact(b.addTest(.{
         .name = "main",
         .root_source_file = b.path("src/main.zig"),
@@ -65,14 +73,6 @@ pub fn build(b: *std.Build) void {
     }));
     test_step.dependOn(&main_tests.step);
 
-    const order_tests = b.addRunArtifact(b.addTest(.{
-        .name = "order",
-        .root_source_file = b.path("src/order.zig"),
-        .target = target,
-        .optimize = optimize,
-    }));
-    test_step.dependOn(&order_tests.step);
-
     const option_tests = b.addRunArtifact(b.addTest(.{
         .name = "option",
         .root_source_file = b.path("src/option.zig"),
@@ -80,6 +80,14 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     }));
     test_step.dependOn(&option_tests.step);
+
+    const order_tests = b.addRunArtifact(b.addTest(.{
+        .name = "order",
+        .root_source_file = b.path("src/order.zig"),
+        .target = target,
+        .optimize = optimize,
+    }));
+    test_step.dependOn(&order_tests.step);
 
     const print_tests = b.addRunArtifact(b.addTest(.{
         .name = "print",

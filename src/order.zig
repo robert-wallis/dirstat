@@ -8,97 +8,124 @@ pub const Order = enum {
     valueDescending, // largest to smallest count
 };
 
-/// Caller responsible for calling .deinit().
-/// Sorts the items in the collection.
-/// Use .next() to get the items out of OrderBy in the correct order.
-/// Using .next() is destructive, so once it it exhausted the whole OrderBy structure is no longer valid.
-pub fn OrderBy(comptime V: type, order: Order) type {
-    const KV = struct {
-        key: []const u8,
-        value: V,
-    };
+pub const KV = struct {
+    key: []const u8,
+    value: u64,
+};
 
-    const compareFn = switch (order) {
-        .keyAscending => keyAscendingCompare(KV),
-        .keyDescending => keyDescendingCompare(KV),
-        .valueAscending => valueAscendingCompare(KV),
-        .valueDescending => valueDescendingCompare(KV),
-    };
-    const CollectionPQ = std.PriorityQueue(KV, void, compareFn);
+//
+const ContextKeyAsc = struct {
+    const Self = @This();
+    items: []KV,
+    pub fn lessThan(ctx: @This(), a: usize, b: usize) bool {
+        return std.mem.lessThan(u8, ctx.items[a].key, ctx.items[b].key);
+    }
 
-    return struct {
-        const Self = @This();
+    pub fn swap(ctx: @This(), a: usize, b: usize) void {
+        return std.mem.swap(KV, &ctx.items[a], &ctx.items[b]);
+    }
+};
 
-        queue: CollectionPQ,
+const ContextKeyDesc = struct {
+    const Self = @This();
+    items: []KV,
+    pub fn lessThan(ctx: @This(), a: usize, b: usize) bool {
+        return std.mem.lessThan(u8, ctx.items[b].key, ctx.items[a].key); // backwards on purpose to do descending
+    }
 
-        pub fn init(allocator: std.mem.Allocator) Self {
-            return .{
-                .queue = CollectionPQ.init(allocator, {}),
-            };
-        }
+    pub fn swap(ctx: @This(), a: usize, b: usize) void {
+        return std.mem.swap(KV, &ctx.items[a], &ctx.items[b]);
+    }
+};
 
-        pub fn add(self: *Self, key: []const u8, value: V) !void {
-            try self.queue.add(.{ .key = key, .value = value });
-        }
+const ContextValueAsc = struct {
+    const Self = @This();
+    items: []KV,
+    pub fn lessThan(ctx: @This(), a: usize, b: usize) bool {
+        return ctx.items[a].value < ctx.items[b].value;
+    }
 
-        /// Adds all the items where the key is an enum.  Changes the key to the @tagName of the enum.
-        pub fn addEnumIterator(self: *Self, iter: anytype) !void {
-            while (iter.next()) |elem| {
-                if (elem.value.* > 0)
-                    try self.add(@tagName(elem.key), elem.value.*);
-            }
-        }
+    pub fn swap(ctx: @This(), a: usize, b: usize) void {
+        return std.mem.swap(KV, &ctx.items[a], &ctx.items[b]);
+    }
+};
 
-        /// Adds all the items where the key is a string.
-        pub fn addPtrIterator(self: *Self, iter: anytype) !void {
-            while (iter.next()) |elem| {
-                if (elem.value_ptr.* > 0)
-                    try self.add(elem.key_ptr.*, elem.value_ptr.*);
-            }
-        }
+const ContextValueDesc = struct {
+    const Self = @This();
+    items: []KV,
+    pub fn lessThan(ctx: @This(), a: usize, b: usize) bool {
+        return ctx.items[a].value > ctx.items[b].value;
+    }
 
-        pub fn deinit(self: Self) void {
-            self.queue.deinit();
-        }
+    pub fn swap(ctx: @This(), a: usize, b: usize) void {
+        return std.mem.swap(KV, &ctx.items[a], &ctx.items[b]);
+    }
+};
 
-        /// Returns the next item pair or null if there are no more left.
-        /// Exhausts the inner collection.
-        pub fn next(self: *Self) ?KV {
-            return self.queue.removeOrNull();
-        }
-    };
+const ContextUnion = union(Order) {
+    const Self = @This();
+
+    keyAscending: ContextKeyAsc,
+    keyDescending: ContextKeyDesc,
+    valueAscending: ContextValueAsc,
+    valueDescending: ContextValueDesc,
+
+    fn fromOrder(order: Order, items: []KV) ContextUnion {
+        return switch (order) {
+            .keyAscending => .{ .keyAscending = ContextKeyAsc{ .items = items } },
+            .keyDescending => .{ .keyDescending = ContextKeyDesc{ .items = items } },
+            .valueAscending => .{ .valueAscending = ContextValueAsc{ .items = items } },
+            .valueDescending => .{ .valueDescending = ContextValueDesc{ .items = items } },
+        };
+    }
+
+    pub fn lessThan(self: Self, a: usize, b: usize) bool {
+        return switch (self) {
+            .keyAscending => |c| c.lessThan(a, b),
+            .keyDescending => |c| c.lessThan(a, b),
+            .valueAscending => |c| c.lessThan(a, b),
+            .valueDescending => |c| c.lessThan(a, b),
+        };
+    }
+
+    pub fn swap(self: Self, a: usize, b: usize) void {
+        return switch (self) {
+            .keyAscending => |c| c.swap(a, b),
+            .keyDescending => |c| c.swap(a, b),
+            .valueAscending => |c| c.swap(a, b),
+            .valueDescending => |c| c.swap(a, b),
+        };
+    }
+};
+
+pub fn sortEnumIterator(allocator: std.mem.Allocator, iterator: anytype, order: Order) ![]KV {
+    var list = std.ArrayList(KV).init(allocator);
+    defer list.deinit();
+
+    while (iterator.next()) |entry| {
+        if (entry.value.* > 0)
+            try list.append(.{ .key = @tagName(entry.key), .value = entry.value.* });
+    }
+
+    const ctx = ContextUnion.fromOrder(order, list.items);
+    std.sort.pdqContext(0, list.items.len, ctx);
+
+    return try list.toOwnedSlice();
 }
 
-fn valueAscendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
-    return struct {
-        fn compare(_: void, a: KV, b: KV) std.math.Order {
-            return std.math.order(a.value, b.value);
-        }
-    }.compare;
-}
+pub fn sortStringIterator(allocator: std.mem.Allocator, iterator: anytype, order: Order) ![]KV {
+    var list = std.ArrayList(KV).init(allocator);
+    defer list.deinit();
 
-fn valueDescendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
-    return struct {
-        fn compare(_: void, a: KV, b: KV) std.math.Order {
-            return std.math.order(b.value, a.value);
-        }
-    }.compare;
-}
+    while (iterator.next()) |entry| {
+        if (entry.value_ptr.* > 0)
+            try list.append(.{ .key = entry.key_ptr.*, .value = entry.value_ptr.* });
+    }
 
-fn keyAscendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
-    return struct {
-        fn compare(_: void, a: KV, b: KV) std.math.Order {
-            return std.mem.order(u8, a.key, b.key);
-        }
-    }.compare;
-}
+    const ctx = ContextUnion.fromOrder(order, list.items);
+    std.sort.pdqContext(0, list.items.len, ctx);
 
-fn keyDescendingCompare(comptime KV: type) (fn (_: void, a: KV, b: KV) std.math.Order) {
-    return struct {
-        fn compare(_: void, a: KV, b: KV) std.math.Order {
-            return std.mem.order(u8, b.key, a.key);
-        }
-    }.compare;
+    return try list.toOwnedSlice();
 }
 
 test "OrderBy .value K:[]const u8" {
@@ -110,36 +137,24 @@ test "OrderBy .value K:[]const u8" {
     try hash_map.put("b", 255);
 
     {
-        var ob = OrderBy(u32, .valueDescending).init(allocator);
-        defer ob.deinit();
+        var iterator = hash_map.iterator();
+        const items = try sortStringIterator(allocator, &iterator, .valueDescending);
+        defer allocator.free(items);
 
-        var iter = hash_map.iterator();
-        try ob.addPtrIterator(&iter);
-
-        const a = ob.next();
-        const b = ob.next();
-        const c = ob.next();
-        const d = ob.next();
-        try std.testing.expectEqual(255, a.?.value);
-        try std.testing.expectEqual(10, b.?.value);
-        try std.testing.expectEqual(1, c.?.value);
-        try std.testing.expectEqual(null, d);
+        try std.testing.expectEqual(255, items[0].value);
+        try std.testing.expectEqual(10, items[1].value);
+        try std.testing.expectEqual(1, items[2].value);
+        try std.testing.expectEqual(3, items.len);
     }
     {
-        var ob = OrderBy(u32, .valueAscending).init(allocator);
-        defer ob.deinit();
+        var iterator = hash_map.iterator();
+        const items = try sortStringIterator(allocator, &iterator, .valueAscending);
+        defer allocator.free(items);
 
-        var iter = hash_map.iterator();
-        try ob.addPtrIterator(&iter);
-
-        const a = ob.next();
-        const b = ob.next();
-        const c = ob.next();
-        const d = ob.next();
-        try std.testing.expectEqual(1, a.?.value);
-        try std.testing.expectEqual(10, b.?.value);
-        try std.testing.expectEqual(255, c.?.value);
-        try std.testing.expectEqual(null, d);
+        try std.testing.expectEqual(1, items[0].value);
+        try std.testing.expectEqual(10, items[1].value);
+        try std.testing.expectEqual(255, items[2].value);
+        try std.testing.expectEqual(3, items.len);
     }
 }
 
@@ -152,36 +167,24 @@ test "OrderBy .key K:[]const u8" {
     try hash_map.put("b", 255);
 
     {
-        var ob = OrderBy(u32, .keyAscending).init(allocator);
-        defer ob.deinit();
+        var iterator = hash_map.iterator();
+        const items = try sortStringIterator(allocator, &iterator, .keyDescending);
+        defer allocator.free(items);
 
-        var iter = hash_map.iterator();
-        try ob.addPtrIterator(&iter);
-
-        const a = ob.next();
-        const b = ob.next();
-        const c = ob.next();
-        const d = ob.next();
-        try std.testing.expectEqualStrings("a", a.?.key);
-        try std.testing.expectEqualStrings("b", b.?.key);
-        try std.testing.expectEqualStrings("c", c.?.key);
-        try std.testing.expectEqual(null, d);
+        try std.testing.expectEqualStrings("c", items[0].key);
+        try std.testing.expectEqualStrings("b", items[1].key);
+        try std.testing.expectEqualStrings("a", items[2].key);
+        try std.testing.expectEqual(3, items.len);
     }
     {
-        var ob = OrderBy(u32, .keyDescending).init(allocator);
-        defer ob.deinit();
+        var iterator = hash_map.iterator();
+        const items = try sortStringIterator(allocator, &iterator, .keyAscending);
+        defer allocator.free(items);
 
-        var iter = hash_map.iterator();
-        try ob.addPtrIterator(&iter);
-
-        const a = ob.next();
-        const b = ob.next();
-        const c = ob.next();
-        const d = ob.next();
-        try std.testing.expectEqualStrings("c", a.?.key);
-        try std.testing.expectEqualStrings("b", b.?.key);
-        try std.testing.expectEqualStrings("a", c.?.key);
-        try std.testing.expectEqual(null, d);
+        try std.testing.expectEqualStrings("a", items[0].key);
+        try std.testing.expectEqualStrings("b", items[1].key);
+        try std.testing.expectEqualStrings("c", items[2].key);
+        try std.testing.expectEqual(3, items.len);
     }
 }
 
@@ -193,35 +196,23 @@ test "OrderBy .key K:enum" {
     enum_array.set(.sym_link, 255);
 
     {
-        var ob = OrderBy(u32, .keyAscending).init(allocator);
-        defer ob.deinit();
+        var iterator = enum_array.iterator();
+        const items = try sortEnumIterator(allocator, &iterator, .keyAscending);
+        defer allocator.free(items);
 
-        var iter = enum_array.iterator();
-        try ob.addEnumIterator(&iter);
-
-        const a = ob.next();
-        const b = ob.next();
-        const c = ob.next();
-        const d = ob.next();
-        try std.testing.expectEqualStrings("directory", a.?.key);
-        try std.testing.expectEqualStrings("file", b.?.key);
-        try std.testing.expectEqualStrings("sym_link", c.?.key);
-        try std.testing.expectEqual(null, d);
+        try std.testing.expectEqualStrings("directory", items[0].key);
+        try std.testing.expectEqualStrings("file", items[1].key);
+        try std.testing.expectEqualStrings("sym_link", items[2].key);
+        try std.testing.expectEqual(3, items.len);
     }
     {
-        var ob = OrderBy(u32, .keyDescending).init(allocator);
-        defer ob.deinit();
+        var iterator = enum_array.iterator();
+        const items = try sortEnumIterator(allocator, &iterator, .keyDescending);
+        defer allocator.free(items);
 
-        var iter = enum_array.iterator();
-        try ob.addEnumIterator(&iter);
-
-        const a = ob.next();
-        const b = ob.next();
-        const c = ob.next();
-        const d = ob.next();
-        try std.testing.expectEqualStrings("sym_link", a.?.key);
-        try std.testing.expectEqualStrings("file", b.?.key);
-        try std.testing.expectEqualStrings("directory", c.?.key);
-        try std.testing.expectEqual(null, d);
+        try std.testing.expectEqualStrings("sym_link", items[0].key);
+        try std.testing.expectEqualStrings("file", items[1].key);
+        try std.testing.expectEqualStrings("directory", items[2].key);
+        try std.testing.expectEqual(3, items.len);
     }
 }
